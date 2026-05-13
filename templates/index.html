@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Air Quality Forecaster | AI Powered</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="glass-container">
+        <header>
+            <div
+                style="position: relative; display: flex; justify-content: center; align-items: center; margin-bottom: 0.5rem; min-height: 80px;">
+                <div class="logo" style="margin-bottom: 0;">
+                    <span class="icon">🌍</span>
+                    <h1>NCR Pollution Intelligence</h1>
+                </div>
+                <div id="live-clock"
+                    style="position: absolute; right: 0; font-family: 'Outfit', sans-serif; font-weight: 600; color: #38bdf8; background: rgba(56, 189, 248, 0.1); padding: 5px 15px; border-radius: 20px; border: 1px solid rgba(56, 189, 248, 0.2); font-size: 0.85rem; letter-spacing: 0.5px;">
+                    --:--:--
+                </div>
+            </div>
+            <p class="subtitle">AI-Powered Source Identification & Forecasting System</p>
+            <div class="system-status-banner">
+                <div class="status-indicator"></div>
+                <span id="status-text">SYSTEM ACTIVE: Retraining Deep Learning Engines with Regional NCR
+                    Datasets...</span>
+            </div>
+        </header>
+
+        <main class="dashboard">
+            <div class="card panel-input">
+                <h2>Predict AQI (Next 24h)</h2>
+
+                <div class="input-group" style="margin-bottom: 1rem;">
+                    <label for="station-selector">📍 SELECT NCR REGION FOR LIVE DATA</label>
+                    <select id="station-selector" class="custom-select"
+                        style="width: 100%; padding: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-family: inherit; font-size: 0.9rem; cursor: pointer;">
+                        <option value="NCR_AVG,NCR_AVG,NCR Average">🌏 WHOLE NCR (Regional Average)</option>
+                        <option value="27.5667,76.6083,Alwar">Alwar (Rajasthan Hub)</option>
+                        <option value="28.6469,77.3164,Anand Vihar">Anand Vihar (East Delhi)</option>
+                        <option value="28.2096,76.8406,Bhiwadi">Bhiwadi (Extreme Industrial)</option>
+                        <option value="28.4070,77.8498,Bulandshahr">Bulandshahr (UP Hub)</option>
+                        <option value="28.6139,77.2090,Delhi">Central Delhi (Safdarjung)</option>
+                        <option value="28.6560,77.2340,Chandni Chowk">Chandni Chowk (Traffic Hotspot)</option>
+                        <option value="28.5823,77.0500,Dwarka">Dwarka (South West Hub)</option>
+                        <option value="28.4089,77.3178,Sector 30, Faridabad - HSPCB">Faridabad Sector 30</option>
+                        <option value="28.6460,77.3680,Ghaziabad (Indirapuram)">Ghaziabad (Indirapuram)</option>
+                        <option value="28.7300,77.2800,Ghaziabad (Loni)">Ghaziabad (Loni Border)</option>
+                        <option value="28.4744,77.5030,Greater Noida">Greater Noida (Knowledge Park)</option>
+                        <option value="28.4502,77.0266,Vikas Sadan, Gurugram">Gurugram (Vikas Sadan)</option>
+                        <option value="28.7306,77.7758,Hapur">Hapur (NCR Gateway)</option>
+                        <option value="28.9845,77.7064,Meerut">Meerut (Inner NCR)</option>
+                        <option value="29.4727,77.7085,Muzaffarnagar">Muzaffarnagar (North Hub)</option>
+                        <option value="28.6090,76.9850,Najafgarh">Najafgarh (Rural/Border Hub)</option>
+                        <option value="28.6246,77.3649,Sector - 62, Noida - IMD">Noida Sector 62</option>
+                        <option value="28.7300,77.1700,Jahangirpuri">North Delhi (Jahangirpuri)</option>
+                        <option value="28.7000,77.1200,Rohini">Rohini (Residential Mix)</option>
+                        <option value="28.9800,77.0200,Sonipat">Sonipat (Industrial Hub)</option>
+                        <option value="28.5562,77.0999,Palam">South-West Delhi (IGI Palam)</option>
+                    </select>
+                    <!-- Station Name synced inside form -->
+                </div>
+
+                <button type="button" id="btn-fetch-weather" class="btn-secondary">
+                    ☁️ Sync Live NCR Data
+                </button>
+
+                <!-- NEW: Live Metrics Feed -->
+                <div class="live-metrics-container">
+                    <label>📡 Real-time Sensor Feed</label>
+                    <div class="live-metrics-grid" id="live-metrics-grid">
+                        {% for feature in features %}
+                        {% if feature not in ['month', 'day', 'hour', 'is_weekend', 'MONTH', 'DAY', 'HOUR',
+                        'visibility', 'nearby_fires', 'fire_count', 'frp', 'fire_frp_sum'] %}
+                        <div class="metric-card">
+                            <span class="metric-label">
+                                {% if feature == 'pm25' %}
+                                PM2.5
+                                {% else %}
+                                {{ feature | upper }}
+                                {% endif %}
+                            </span>
+                            <span class="metric-value" id="val-{{ feature }}">--</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <form id="prediction-form" class="prediction-form">
+                    <input type="hidden" id="Station_Name" name="Station_Name" value="Unknown Station">
+                    <input type="hidden" id="lat" name="lat" value="28.6139">
+                    <input type="hidden" id="lon" name="lon" value="77.2090">
+
+                    <!-- NEW: Simulation Mode Toggle -->
+                    <div class="simulation-mode-panel">
+                        <div class="toggle-container" id="toggle-simulation">
+                            <div class="toggle-switch"></div>
+                            <span style="font-size: 0.8rem; color: #94a3b8; font-weight: 600;">Enable Manual Simulation
+                                Mode</span>
+                        </div>
+                    </div>
+
+                    <div id="simulation-controls" class="hidden fade-in">
+                        <div class="input-grid">
+                            <div class="input-group" style="grid-column: 1 / -1;">
+                                <label for="datetimepicker">SIMULATION TARGET TIME</label>
+                                <input type="datetime-local" id="datetimepicker" required>
+                            </div>
+                            {% for feature in features %}
+                            {% if feature in ['month', 'day', 'hour', 'MONTH', 'DAY', 'HOUR', 'visibility',
+                            'nearby_fires', 'fire_count', 'frp', 'fire_frp_sum', 'aqi_lag_24', 'is_weekend'] %}
+                            <input type="hidden" id="{{ feature }}" name="{{ feature }}" value="0">
+                            {% else %}
+                            <div class="input-group">
+                                <label for="{{ feature }}">
+                                    {% if feature == 'pm25' %}
+                                    PM2.5
+                                    {% else %}
+                                    {{ feature | upper }}
+                                    {% endif %}
+                                </label>
+                                <input type="number" step="any" id="{{ feature }}" name="{{ feature }}" required
+                                    placeholder="0.0">
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        <div id="policy-scenarios" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed rgba(255,255,255,0.1);">
+                            <label style="display: block; margin-bottom: 0.8rem; font-size: 0.7rem; color: #38bdf8;">🎭 POLICY SCENARIO INTELLIGENCE</label>
+                            <div style="display: flex; gap: 10px;">
+                                <button type="button" id="btn-policy-construction" class="btn-secondary" style="margin-bottom: 0; font-size: 0.75rem; flex: 1;">🚫 Construction Ban</button>
+                                <button type="button" id="btn-policy-traffic" class="btn-secondary" style="margin-bottom: 0; font-size: 0.75rem; flex: 1;">🚗 Odd-Even Traffic</button>
+                            </div>
+                            <p style="font-size: 0.65rem; color: #64748b; margin-top: 8px; font-style: italic;">Note: Scenarios simulate 30-40% reduction in specific pollutant groups.</p>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-predict">
+                        <span>Generate Intelligence Report</span>
+                        <div class="loader" id="loader"></div>
+                    </button>
+                </form>
+                <div id="result-container" class="result-hidden">
+                    <h3>Forecasted AQI</h3>
+                    <div class="aqi-ring">
+                        <svg viewBox="0 0 36 36" class="circular-chart" width="150" height="150"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path class="circle-bg"
+                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <path class="circle" id="aqi-circle" stroke-dasharray="0, 100"
+                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <text x="18" y="20.35" class="percentage" id="aqi-value">--</text>
+                        </svg>
+                    </div>
+                    <p id="aqi-category" class="category">Awaiting Input</p>
+                    
+                    <!-- NEW: Health Advisory Box -->
+                    <div id="health-advisory-box" style="margin: 1.5rem 0; padding: 12px; background: rgba(56, 189, 248, 0.05); border-left: 4px solid #38bdf8; border-radius: 4px; text-align: left; display: none;">
+                        <h4 style="font-size: 0.85rem; color: #38bdf8; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px;">🛡️ Health Advisory</h4>
+                        <p id="health-advisory-text" style="font-size: 0.82rem; color: #e2e8f0; line-height: 1.4; margin: 0;">--</p>
+                    </div>
+
+                    <p id="prediction-source"
+                        style="font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 5px; margin-bottom: 20px; font-weight: 600;">
+                    </p>
+
+                    <!-- LSTM Specific Section -->
+                    <div id="lstm-container" style="margin-top: 1rem;">
+                        <div id="lstm-inner"
+                            style="background: rgba(168, 85, 247, 0.05); border: 1px dashed rgba(168, 85, 247, 0.3); padding: 12px; border-radius: 8px; text-align: center;">
+                            <p
+                                style="font-size: 0.7rem; color: #a855f7; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">
+                                72h Temporal Forecast (LSTM)</p>
+                            <h4 id="lstm-value" style="color: #94a3b8; font-size: 1.1rem; font-weight: 600; margin: 0;">
+                                Inference Idle</h4>
+                            <p id="lstm-status-text" style="font-size: 0.65rem; color: #64748b; margin-top: 4px;">Run
+                                train_lstm.py to activate deep learning</p>
+                        </div>
+                    </div>
+
+                    <div
+                        style="margin-top: 1.5rem; padding: 1rem; background: rgba(15, 23, 42, 0.4); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                        <p
+                            style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px;">
+                            Primary Source Identified:</p>
+                        <h4 id="primary-source" style="color: #cbd5e1; font-weight: 600; margin: 0; font-size: 1.1rem;">
+                            --</h4>
+                        <div id="source-probabilities" style="margin-top: 1rem; font-size: 0.85rem; color: #cbd5e1;">
+                        </div>
+                        <div id="health-advice"
+                            style="margin-top: 1rem; padding: 10px; background: rgba(255, 255, 255, 0.05); border-left: 3px solid #facc15; border-radius: 4px; font-size: 0.85rem; color: #e2e8f0; display: none;">
+                        </div>
+                        <div
+                            style="margin-top: 1rem; display: flex; gap: 1rem; font-size: 0.8rem; color: #94a3b8; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.5rem;">
+                            <span>🔥 PM Ratio: <strong id="ratio-pm" style="color: #38bdf8;">--</strong></span>
+                            <span>🏭 Ind. Ratio: <strong id="ratio-so2" style="color: #f87171;">--</strong></span>
+                        </div>
+
+                        <!-- Fingerprint Conclusion -->
+                        <div id="fingerprint-conclusion"
+                            style="margin-top: 0.8rem; background: rgba(56, 189, 248, 0.1); padding: 8px 12px; border-radius: 6px; font-size: 0.78rem; color: #38bdf8; line-height: 1.4; text-align: center; border: 1px solid rgba(56, 189, 248, 0.2); font-style: italic;">
+                            Chemical signature analysis pending...
+                        </div>
+                    </div>
+
+                    <div class="trend-chart-wrapper" style="height: 200px; margin-top: 2rem; display: none;"
+                        id="trend-chart-container">
+                        <h4 style="color: #cbd5e1; margin-bottom: 10px; font-size: 0.9rem;">24h Historical vs Predicted
+                            Trend</h4>
+                        <canvas id="trendChart"></canvas>
+                    </div>
+
+                    <div class="hourly-forecast-wrapper" style="margin-top: 2rem; display: none;" id="hourly-forecast-container">
+                        <h4 style="color: #cbd5e1; margin-bottom: 15px; font-size: 0.9rem;">24h Forecast Matrix</h4>
+                        <div class="hourly-slider" id="hourly-timeline">
+                            <!-- populated by js -->
+                        </div>
+                    </div>
+
+
+                    <button type="button" id="btn-export" class="btn-secondary"
+                        style="margin-top: 2rem; background: rgba(16, 185, 129, 0.1); border-color: #10b981; color: #10b981;">
+                        📄 Generate PDF Report
+                    </button>
+                </div>
+            </div>
+
+            <div class="card panel-chart">
+                <h2>AI Classification Confidence</h2>
+                <div class="chart-wrapper" style="height: 260px; margin-bottom: 2rem;">
+                    <canvas id="donutChart"></canvas>
+                </div>
+
+                <h2 style="margin-top: 1rem;">Pollution Drivers (SHAP Analysis)</h2>
+                <p>Features contributing to overall AQI levels according to the AI model</p>
+                <div class="chart-wrapper">
+                    <canvas id="importanceChart"></canvas>
+                </div>
+
+                <h2 style="margin-top: 2rem;">Wind-AQI Dispersion Matrix</h2>
+                <p>Correlation between wind speed and pollutant clearance</p>
+                <div class="chart-wrapper" style="height: 220px; margin-bottom: 0.5rem;">
+                    <canvas id="weatherCorrelationChart"></canvas>
+                </div>
+                <div id="wind-insight"
+                    style="margin-top: 1rem; padding: 10px; background: rgba(147, 197, 253, 0.1); border: 1px solid rgba(147, 197, 253, 0.2); border-radius: 8px; font-size: 0.82rem; color: #93c5fd; text-align: center; font-style: italic;">
+                    <span id="wind-insight-text">Analyzing wind dispersion patterns...</span>
+                </div>
+
+
+                <div class="map-section" style="margin-top: 2rem;">
+                    <h3>Source Localization Map</h3>
+                    <p style="margin-bottom: 1rem; color: #94a3b8;">Identifying local industrial & power plant
+                        facilities contributing to pollution.</p>
+
+                    <div class="map-controls"
+                        style="margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 0.8rem; font-size: 0.9rem;">
+                        <label
+                            style="display: flex; align-items: center; gap: 5px; cursor: pointer; background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 6px;"><input
+                                type="checkbox" id="toggle-industry" checked> <span style="color:#ef4444">🏭
+                                Industry</span></label>
+                        <label
+                            style="display: flex; align-items: center; gap: 5px; cursor: pointer; background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 6px;"><input
+                                type="checkbox" id="toggle-traffic" checked> <span style="color:#f59e0b">🚗
+                                Traffic</span></label>
+                        <label
+                            style="display: flex; align-items: center; gap: 5px; cursor: pointer; background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 6px;"><input
+                                type="checkbox" id="toggle-construction" checked> <span style="color:#eab308">🏗️
+                                Construction</span></label>
+                        <label
+                            style="display: flex; align-items: center; gap: 5px; cursor: pointer; background: rgba(249, 115, 22, 0.1); padding: 5px 10px; border-radius: 6px;"><input
+                                type="checkbox" id="toggle-biomass" checked> <span style="color:#f97316">🔥
+                                Biomass</span></label>
+                        <label
+                            style="display: flex; align-items: center; gap: 5px; cursor: pointer; background: rgba(16, 185, 129, 0.1); padding: 5px 10px; border-radius: 6px;"><input
+                                type="checkbox" id="toggle-wind" checked> <span style="color:#10b981">🌬️
+                                Wind Vectors</span></label>
+                        <label
+                            style="display: flex; align-items: center; gap: 5px; cursor: pointer; background: rgba(30,58,138,0.3); padding: 5px 10px; border-radius: 6px;"><input
+                                type="checkbox" id="toggle-heatmap" checked> <span style="color:#38bdf8">🔥
+                                Heatmap</span></label>
+                    </div>
+
+                    <div id="source-map"
+                        style="height: 720px; width: 100%; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card panel-history" style="grid-column: 1 / -1; margin-top: 1rem;">
+                <h2>Database Prediction History</h2>
+                <p style="color: #94a3b8; margin-bottom: 1rem; font-size: 0.9rem;">Recent analysis logs saved
+                    dynamically into the database.</p>
+                <div style="overflow-x: auto;">
+                    <table
+                        style="width: 100%; text-align: left; border-collapse: collapse; font-size: 0.9rem; background: rgba(15, 23, 42, 0.4); border-radius: 8px;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #cbd5e1;">
+                                <th style="padding: 12px;">Time</th>
+                                <th style="padding: 12px;">Location</th>
+                                <th style="padding: 12px;">AQI</th>
+                                <th style="padding: 12px;">Primary Source</th>
+                                <th style="padding: 12px;">PM25</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Pass data to JS -->
+    <script>
+        const featureImportance = {{ feature_importance | tojson }};
+    </script>
+    <!-- Include html2pdf for report generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script async defer
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB7GPS_v5uRqzDRr-syj2HQb1s5rjkjqIs&callback=initMap&libraries=places,visualization"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=2"></script>
+</body>
+
+</html>
